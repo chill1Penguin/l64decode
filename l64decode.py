@@ -28,28 +28,36 @@ from pprint import pprint
 import argparse
 import os
 
-_lut = [ 0x14, 0x0B, 0x09, 0x02, 0x08, 0x03, 0x03, 0x03 ]
+_lut3 = [ 0x14, 0x0B, 0x09, 0x02, 0x08, 0x03, 0x03, 0x03 ]
+_lut4 = [ 0x06, 0x10, 0x0C, 0x02, 0x09, 0x03, 0x04, 0x04, 0x09, 0x05, 0x04, 0x02, 0x05, 0x08, 0x09, 0x15 ]
 
 def DecodeFile(src, dest, overwrite):
-    print('Processing ' + src + '...')
+    print('Processing {0}...'.format(src))
     try:
         with open(src, 'rb') as f:
             srcFile = bytearray(f.read())
     except FileNotFoundError:
-        print('File "' + src + '" not found.')
+        print('File "{0}" not found.'.format(src))
         return
     except:
-        print('Failed to read file "' + src + '".')
+        print('Failed to read file "{0}".'.format(src))
         return
 
-    if len(srcFile) >= 4 and srcFile[0] == 0x1B and srcFile[1] == 0x4C and srcFile[2] == 0x4A and srcFile[3] == 0x03:
+    if len(srcFile) < 4 or srcFile[0] != 0x1B or srcFile[1] != 0x4C or srcFile[2] != 0x4A:
+        print('File "{0}" contains an invalid .l64 header.'.format(src))
+        return
+
+    if srcFile[3] == 0x03:
         srcFile[3] = 2
+        for i in range(4, len(srcFile)):
+            srcFile[i] = (srcFile[i] + (_lut3[i & 0x07] + i)) & 0xFF
+    elif srcFile[3] == 0x04:
+        srcFile[3] = 2
+        for i in range(4, len(srcFile)):
+            srcFile[i] = (srcFile[i] + (_lut4[i & 0x0F] + i)) & 0xFF
     else:
-        print('File "' + src + '" contains an invalid .l64 header.')
+        print('This decoder cannot decode "{0}". The file is encoded using version {1} which is not supported.'.format(src, srcfile[3]))
         return
-
-    for i in range(4, len(srcFile)):
-        srcFile[i] = (srcFile[i] + (_lut[i & 0x07] + i)) & 0xFF
 
     if os.path.isdir(dest):
         fullDestPath = os.path.join(dest, os.path.splitext(os.path.split(src)[1])[0] + '.lua')
@@ -60,10 +68,10 @@ def DecodeFile(src, dest, overwrite):
         with open(fullDestPath, 'wb' if overwrite else 'xb') as f:
             f.write(srcFile)
     except FileExistsError:
-        print('The file "' + fullDestPath + '" already exists. To overwrite, please specify the -o command line argument.')
+        print('The file "{0}" already exists. To overwrite, please specify the -o command line argument.'.format(fullDestPath))
         return
     except:
-        print('Could not open file "' + fullDestPath + '" for writing.')
+        print('Could not open file "{0}" for writing.'.format(fullDestPath))
         return
 
 def DecodeFolder(src, subpath, dest, recursive, overwrite):
